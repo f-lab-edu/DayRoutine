@@ -1,5 +1,6 @@
 package com.hyeon.dayroutine.ui.home
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -29,6 +30,7 @@ import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -51,10 +53,13 @@ import java.time.LocalTime
 import java.time.format.TextStyle
 import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen() {
     val dayOfWeekList = testDayDate()
     val dayChipGroupListState = rememberLazyListState()
+    var isShowBottomSheet by remember { mutableStateOf(false) }
+    val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     var checkTest by remember { mutableStateOf(false) }
 
@@ -86,6 +91,10 @@ fun HomeScreen() {
                 )
 
                 Text(
+                    modifier = Modifier
+                        .clickable{
+                            isShowBottomSheet = true
+                        },
                     text = "+ 추가",
                     color = Color(0xFF6c63ff),
                     fontSize = 14.sp,
@@ -99,6 +108,14 @@ fun HomeScreen() {
                 isChecked = checkTest,
                 onChecked = { checkTest = it }
             )
+
+            if (isShowBottomSheet) {
+                AddRoutineBottomSheet(
+                    bottomSheetState = bottomSheetState
+                ) {
+                    isShowBottomSheet = false
+                }
+            }
         }
     }
 }
@@ -115,17 +132,17 @@ fun TopBar() {
         Text(
             text = "오늘의 루틴을 향하여🔥",
             color = Color.Gray,
-            fontSize = 12.sp
+            fontSize = 14.sp
         )
 
         Text(
             text = "오늘의 루틴",
             color = Color.White,
-            fontSize = 16.sp,
+            fontSize = 20.sp,
             fontWeight = FontWeight.Bold
         )
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(12.dp))
 
         Column(
             modifier = Modifier

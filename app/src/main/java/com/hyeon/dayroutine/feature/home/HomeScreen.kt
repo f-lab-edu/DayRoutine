@@ -1,6 +1,5 @@
-package com.hyeon.dayroutine.ui.home
+package com.hyeon.dayroutine.feature.home
 
-import android.annotation.SuppressLint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable

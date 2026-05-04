@@ -8,18 +8,46 @@ import com.hyeon.dayroutine.domain.repository.RoutineRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import com.hyeon.dayroutine.feature.home.HomeContract.*
+import com.hyeon.dayroutine.feature.home.model.RoutineWithCheck
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import javax.inject.Inject
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val routineRepository: RoutineRepository
 ) : ViewModel() {
     private val _state = MutableStateFlow(HomeState())
     val state = _state.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            combine(
+                routineRepository.getAll(),
+                _state.map { it.selectedDate }.flatMapLatest {
+                    routineRepository.getCompletionsByDate(it.dayOfWeek.name)
+                }
+            ) { routines, routineCompletions ->
+                routines.map { routine ->
+                    RoutineWithCheck(
+                        routine = routine,
+                        isChecked = routineCompletions.any {
+                            it.routineId == routine.id && it.isComplete
+                        }
+                    )
+                }
+            }.collect { routineWithChecks ->
+                _state.update { it.copy(routineList = routineWithChecks) }
+            }
+        }
+    }
 
     fun handleIntent(intent: HomeIntent) {
         when (intent) {

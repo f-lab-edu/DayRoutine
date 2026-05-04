@@ -66,7 +66,7 @@ fun HomeScreen(
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = Color(0xFF13131f),
-        topBar = { TopBar() }
+        topBar = { TopBar(state) }
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -122,7 +122,13 @@ fun HomeScreen(
 }
 
 @Composable
-fun TopBar() {
+fun TopBar(
+    state: HomeState
+) {
+    val totalRoutineCnt = state.routineList.size
+    val completeRoutineCnt = state.routineList.count { it.isChecked }
+    val progress = if(totalRoutineCnt == 0) 0f else completeRoutineCnt.toFloat() / totalRoutineCnt
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -164,7 +170,7 @@ fun TopBar() {
                     fontSize = 12.sp
                 )
                 Text(
-                    text = "3/5 완료",
+                    text = "${completeRoutineCnt}/${totalRoutineCnt} 완료",
                     color = Color(0xFF8888aa),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold
@@ -175,7 +181,7 @@ fun TopBar() {
 
             RoutineProgress(
                 modifier = Modifier.fillMaxWidth(),
-                progress = 0.6f
+                progress = progress
             )
         }
     }

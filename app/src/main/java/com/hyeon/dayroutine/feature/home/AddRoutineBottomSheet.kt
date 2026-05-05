@@ -1,4 +1,4 @@
-package com.hyeon.dayroutine.ui.home
+package com.hyeon.dayroutine.feature.home
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background

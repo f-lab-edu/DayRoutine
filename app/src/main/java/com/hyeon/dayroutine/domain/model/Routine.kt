@@ -9,6 +9,7 @@ data class Routine(
     val title: String,
     val icon: String,
     val startTime: LocalTime,
+    val durationTime: LocalTime,
     val repeatDays: List<DayOfWeek>,
     val createdAt: LocalDate
 )

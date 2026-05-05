@@ -2,6 +2,7 @@ package com.hyeon.dayroutine.di
 
 import android.content.Context
 import androidx.room.Room
+import com.hyeon.dayroutine.data.local.dao.RoutineCompletionDao
 import com.hyeon.dayroutine.data.local.dao.RoutineDao
 import com.hyeon.dayroutine.data.local.database.RoutineDatabase
 import dagger.Module
@@ -32,5 +33,12 @@ object DatabaseModule {
     fun provideRoutineDao(routineDatabase: RoutineDatabase): RoutineDao {
         return routineDatabase.routineDao()
     }
+
+    @Provides
+    @Singleton
+    fun provideRoutineCompletionDao(routineDatabase: RoutineDatabase): RoutineCompletionDao {
+        return routineDatabase.routineCompletionDao()
+    }
+
 
 }

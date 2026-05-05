@@ -1,12 +1,10 @@
-package com.hyeon.dayroutine.ui.home
+package com.hyeon.dayroutine.feature.home
 
-import android.annotation.SuppressLint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -32,7 +30,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,32 +38,35 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hyeon.dayroutine.domain.model.Routine
+import com.hyeon.dayroutine.feature.home.model.RoutineWithCheck
 import com.hyeon.dayroutine.ui.component.RoutineProgress
-import java.time.DayOfWeek
 import java.time.LocalDate
-import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
+import com.hyeon.dayroutine.feature.home.HomeContract.*
+import java.time.DayOfWeek
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen() {
-    val dayOfWeekList = testDayDate()
+fun HomeScreen(
+    viewModel: HomeViewModel = hiltViewModel()
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
     val dayChipGroupListState = rememberLazyListState()
     var isShowBottomSheet by remember { mutableStateOf(false) }
     val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    var checkTest by remember { mutableStateOf(false) }
-
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = Color(0xFF13131f),
-        topBar = { TopBar() }
+        topBar = { TopBar(state) }
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -75,9 +75,9 @@ fun HomeScreen() {
         ) {
             DayChipGroupList(
                 dayChipGroupListState = dayChipGroupListState,
-                dayOfWeekList = dayOfWeekList,
-            ) { /** 해당 날짜 루틴 목록 업데이트 **/ }
- 
+                selectedDate = state.selectedDate
+            ) { viewModel.handleIntent(HomeIntent.SelectDate(it)) }
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -92,7 +92,7 @@ fun HomeScreen() {
 
                 Text(
                     modifier = Modifier
-                        .clickable{
+                        .clickable {
                             isShowBottomSheet = true
                         },
                     text = "+ 추가",
@@ -103,10 +103,11 @@ fun HomeScreen() {
             }
 
             RoutineList(
-                routineList = routines,
+                routineList = state.routineList,
                 onClickRoutine = { /** 루틴 상세 페이지 이동 **/ },
-                isChecked = checkTest,
-                onChecked = { checkTest = it }
+                onChecked = { routine, isChecked ->
+                    viewModel.handleIntent(HomeIntent.CheckRoutine(routine, isChecked))
+                }
             )
 
             if (isShowBottomSheet) {
@@ -121,7 +122,13 @@ fun HomeScreen() {
 }
 
 @Composable
-fun TopBar() {
+fun TopBar(
+    state: HomeState
+) {
+    val totalRoutineCnt = state.routineList.size
+    val completeRoutineCnt = state.routineList.count { it.isChecked }
+    val progress = if(totalRoutineCnt == 0) 0f else completeRoutineCnt.toFloat() / totalRoutineCnt
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -163,7 +170,7 @@ fun TopBar() {
                     fontSize = 12.sp
                 )
                 Text(
-                    text = "3/5 완료",
+                    text = "${completeRoutineCnt}/${totalRoutineCnt} 완료",
                     color = Color(0xFF8888aa),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold
@@ -174,7 +181,7 @@ fun TopBar() {
 
             RoutineProgress(
                 modifier = Modifier.fillMaxWidth(),
-                progress = 0.6f
+                progress = progress
             )
         }
     }
@@ -183,33 +190,24 @@ fun TopBar() {
 @Composable
 fun DayChipGroupList(
     dayChipGroupListState: LazyListState,
-    dayOfWeekList: List<DayItem>,
-    onDayClick: (DayItem) -> Unit
+    selectedDate: LocalDate,
+    onDayClick: (LocalDate) -> Unit
 ) {
-    BoxWithConstraints {
-        val width = maxWidth
-        val density = LocalDensity.current
+    val weeks = remember {
+        val monday = LocalDate.now().with(DayOfWeek.MONDAY)
 
-        LazyRow(
-            state = dayChipGroupListState,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(dayOfWeekList) {
-                DayOfWeekItem(
-                    dayItem = it,
-                    onDayClick = onDayClick
-                )
-            }
-        }
+        (0..6).map { monday.plusDays(it.toLong()) }
+    }
 
-        LaunchedEffect(Unit) {
-            val offset = with(density) {
-                ((width / 2) - (50 / 2).dp).toPx()
-            }
-
-            dayChipGroupListState.animateScrollToItem(
-                index = 5,
-                scrollOffset = -offset.toInt()
+    LazyRow(
+        state = dayChipGroupListState,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(weeks) {
+            DayOfWeekItem(
+                date = it,
+                isSelected = it == selectedDate,
+                onDayClick = onDayClick
             )
         }
     }
@@ -217,49 +215,47 @@ fun DayChipGroupList(
 
 @Composable
 fun DayOfWeekItem(
-    dayItem: DayItem,
-    onDayClick: (DayItem) -> Unit
+    date: LocalDate,
+    isSelected: Boolean,
+    onDayClick: (LocalDate) -> Unit
 ) {
     Column(
         modifier = Modifier
-            .size(width = 50.dp, height = 60.dp)
+            .size(width = 45.dp, height = 60.dp)
             .background(
-                if (dayItem.isToday) Color(0xFF6c63ff) else Color(0xFF1e1e30),
+                if (isSelected) Color(0xFF6c63ff) else Color(0xFF1e1e30),
                 shape = RoundedCornerShape(6.dp)
             )
-            .clickable {
-                onDayClick(dayItem)
-            },
+            .clickable { onDayClick(date) },
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            text = dayItem.dayOfWeek,
+            text = date.dayOfWeek.getDisplayName(TextStyle.SHORT,Locale.ENGLISH),
             fontSize = 12.sp,
-            color = if (dayItem.isToday) Color(0xFFd4d0ff) else Color(0xFF555577)
+            color = if (isSelected) Color(0xFFd4d0ff) else Color(0xFF555577)
         )
 
         Text(
-            text = dayItem.day.toString(),
+            text = date.dayOfMonth.toString(),
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
-            color = if (dayItem.isToday) Color(0xFFffffff) else Color(0xFFcccccc)
+            color = if (isSelected) Color(0xFFffffff) else Color(0xFFcccccc)
         )
 
         Box(
             modifier = Modifier
                 .size(6.dp)
                 .clip(shape = CircleShape)
-                .background(color = if (dayItem.isToday) Color(0xFFa09fff) else Color(0xFF33334a))
+                .background(color = if (isSelected) Color(0xFFa09fff) else Color(0xFF33334a))
         )
     }
 }
 
 @Composable
 fun RoutineList(
-    routineList: List<Routine>,
-    onClickRoutine: (Routine) -> Unit,
-    isChecked: Boolean,
-    onChecked: (Boolean) -> Unit
+    routineList: List<RoutineWithCheck>,
+    onClickRoutine: (RoutineWithCheck) -> Unit,
+    onChecked: (Routine, Boolean) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.padding(top = 12.dp),
@@ -269,7 +265,6 @@ fun RoutineList(
             RoutineItem(
                 routineItem = it,
                 onClickRoutine = onClickRoutine,
-                isChecked = isChecked,
                 onChecked = onChecked,
             )
         }
@@ -278,148 +273,61 @@ fun RoutineList(
 
 @Composable
 fun RoutineItem(
-    routineItem: Routine,
-    onClickRoutine: (Routine) -> Unit,
-    isChecked: Boolean,
-    onChecked: (Boolean) -> Unit
+    routineItem: RoutineWithCheck,
+    onClickRoutine: (RoutineWithCheck) -> Unit,
+    onChecked: (Routine, Boolean) -> Unit
 ) {
     Row(
-       modifier = Modifier
-           .fillMaxWidth()
-           .background(color = Color(0xFF1a1a2e), shape = RoundedCornerShape(12.dp))
-           .border(width = 1.dp, color = Color(0xFF2a2a3e), shape = RoundedCornerShape(12.dp))
-           .padding(12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(color = Color(0xFF1a1a2e), shape = RoundedCornerShape(12.dp))
+            .border(width = 1.dp, color = Color(0xFF2a2a3e), shape = RoundedCornerShape(12.dp))
+            .padding(12.dp)
+            .clickable {
+                onClickRoutine(routineItem)
+            },
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // TODO: 추후 이미지사용
         Box(
             modifier = Modifier
                 .padding(end = 8.dp)
                 .size(50.dp)
-                .background(color = Color.Red, shape = RoundedCornerShape(12.dp))
-        )
+                .background(color = Color.Transparent, shape = RoundedCornerShape(12.dp))
+                .border(width = 1.dp, color = Color(0xFF2a2a3e), shape = RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = routineItem.routine.icon,
+                fontSize = 25.sp
+            )
+        }
 
         Column(
             modifier = Modifier
-                .weight(1f)
-                .clickable{
-                    onClickRoutine(routineItem)
-                },
+                .weight(1f),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
-                text = "운동명",
+                text = routineItem.routine.title,
                 fontWeight = FontWeight.Bold,
                 color = Color.White
             )
 
             Text(
-                text = "시작시간 및 소요시간",
+                text = "오전 ${routineItem.routine.startTime.format(DateTimeFormatter.ofPattern("hh:mm"))}" +
+                        " · ${routineItem.routine.durationTime.format(DateTimeFormatter.ofPattern("mm"))}분",
                 fontSize = 12.sp,
                 color = Color.Gray
             )
         }
 
         Checkbox(
-            checked = isChecked,
-            onCheckedChange = { onChecked(it) },
+            checked = routineItem.isChecked,
+            onCheckedChange = { onChecked(routineItem.routine, routineItem.isChecked) },
             colors = CheckboxDefaults.colors(
                 checkedColor = Color(0xFF6c63ff),
                 checkmarkColor = Color.White
             )
         )
-
-    }
-
-}
-
-fun testDayDate(): List<DayItem> {
-    val today = LocalDate.now()
-    val range = -5..5
-
-    return range.map {
-        val day = today.plusDays(it.toLong())
-
-        DayItem(
-            dayOfWeek = day.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH),
-            day = day.dayOfMonth,
-            isToday = it == 0
-        )
     }
 }
-
-val routines = listOf(
-    Routine(
-        id = 1,
-        title = "스트레칭",
-        icon = "🧘",
-        startTime = LocalTime.of(7, 0),
-        repeatDays = listOf(
-            DayOfWeek.MONDAY,
-            DayOfWeek.TUESDAY,
-            DayOfWeek.WEDNESDAY,
-            DayOfWeek.THURSDAY,
-            DayOfWeek.FRIDAY
-        ),
-        createdAt = LocalDate.of(2025, 3, 1)
-    ),
-    Routine(
-        id = 2,
-        title = "독서",
-        icon = "📖",
-        startTime = LocalTime.of(7, 30),
-        repeatDays = listOf(
-            DayOfWeek.MONDAY,
-            DayOfWeek.WEDNESDAY,
-            DayOfWeek.FRIDAY
-        ),
-        createdAt = LocalDate.of(2025, 3, 1)
-    ),
-    Routine(
-        id = 3,
-        title = "모닝 커피",
-        icon = "☕",
-        startTime = LocalTime.of(8, 0),
-        repeatDays = DayOfWeek.entries.toList(),  // 매일
-        createdAt = LocalDate.of(2025, 3, 5)
-    ),
-    Routine(
-        id = 4,
-        title = "조깅",
-        icon = "🏃",
-        startTime = LocalTime.of(8, 30),
-        repeatDays = listOf(
-            DayOfWeek.TUESDAY,
-            DayOfWeek.THURSDAY,
-            DayOfWeek.SATURDAY
-        ),
-        createdAt = LocalDate.of(2025, 3, 10)
-    ),
-    Routine(
-        id = 5,
-        title = "명상",
-        icon = "🧘",
-        startTime = LocalTime.of(9, 0),
-        repeatDays = listOf(
-            DayOfWeek.MONDAY,
-            DayOfWeek.WEDNESDAY,
-            DayOfWeek.FRIDAY,
-            DayOfWeek.SUNDAY
-        ),
-        createdAt = LocalDate.of(2025, 3, 15)
-    ),
-    Routine(
-        id = 6,
-        title = "일기 쓰기",
-        icon = "✍️",
-        startTime = LocalTime.of(22, 0),
-        repeatDays = DayOfWeek.entries.toList(),  // 매일
-        createdAt = LocalDate.of(2025, 3, 20)
-    )
-)
-
-data class DayItem(
-    val dayOfWeek: String,
-    val day: Int,
-    val isToday: Boolean,
-)
